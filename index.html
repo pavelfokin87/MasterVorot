@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Мастер Ворот</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,Arial,sans-serif;background:#f5f5f7;color:#1a1a1a;min-height:100vh;padding-bottom:80px}
+button{font-family:inherit;cursor:pointer;border:none}
+#authScreen{position:fixed;inset:0;background:#f5f5f7;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:100;overflow-y:auto}
+#authScreen h1{font-size:24px;margin-bottom:8px;color:#6366f1}
+#authScreen .subtitle{font-size:13px;color:#6b7280;margin-bottom:20px}
+.auth-input{width:100%;max-width:320px;padding:12px;margin:5px 0;background:#fff;border:1px solid #d1d5db;border-radius:10px;color:#1a1a1a;font-size:14px}
+.auth-btn{width:100%;max-width:320px;padding:12px;margin:6px 0;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:10px;font-size:14px;font-weight:bold}
+.auth-btn.ghost{background:transparent;border:1px solid #6366f1;color:#6366f1}
+.auth-error{color:#ef4444;font-size:12px;margin-top:10px;text-align:center;max-width:320px}
+.header{display:flex;align-items:center;padding:12px 16px;background:#fff;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:10;gap:8px}
+.header h1{flex:1;font-size:16px;text-align:center;color:#1a1a1a}
+.header-btn{background:#fff;color:#1a1a1a;padding:8px 12px;border-radius:8px;font-size:12px;border:1px solid #d1d5db}
+.nav{position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));background:#fff;border-top:1px solid #e5e7eb;padding:6px 4px 10px;z-index:10}
+.nav button{background:none;color:#6b7280;padding:8px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.nav button.on{color:#6366f1}
+.nav button.on .nav-ic{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
+.nav-ic{width:28px;height:28px;display:grid;place-items:center;border-radius:8px}
+.screen{display:none;padding:16px}.screen.active{display:block}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:10px}
+.cat-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px}
+.cat-preview{width:100%;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#f3f4f6;margin-bottom:6px}
+.cat-preview svg{width:100%;height:100%}
+.cat-name{font-size:11px;font-weight:bold;color:#1a1a1a}
+.work-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px}
+.work-name{font-size:12px;line-height:1.3;color:#1a1a1a}
+.work-price{font-size:13px;font-weight:bold;color:#6366f1;margin-top:2px}
+.meter-input,.area-input,.qty-input{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.meter-input input,.area-input input,.qty-input input{width:70px;padding:6px;background:#f9fafb;border:1px solid #d1d5db;border-radius:6px;color:#1a1a1a;font-size:12px}
+.meter-input span,.area-input span,.qty-input span{font-size:11px;color:#6b7280}
+.report-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:8px;position:relative;transition:.2s}
+.report-card.selected{border-color:#6366f1;background:#eef2ff;box-shadow:0 0 0 2px #6366f1}
+.report-card .select-check{position:absolute;top:10px;right:10px;width:24px;height:24px;border-radius:50%;border:2px solid #d1d5db;display:none;align-items:center;justify-content:center;background:#fff;color:#1a1a1a;font-size:12px}
+.report-card.selected .select-check{display:flex;background:#6366f1;border-color:#6366f1;color:#fff}
+.report-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding-right:30px}
+.status{padding:3px 8px;border-radius:999px;font-size:10px;font-weight:bold;color:#fff;white-space:nowrap}
+.status-draft{background:#6b7280}.status-pending{background:#f59e0b}.status-approved{background:#10b981}.status-rejected{background:#ef4444}
+.report-date{font-size:11px;color:#6b7280}
+.report-address{font-size:11px;color:#2563eb;margin-top:2px;word-break:break-word}
+.report-worker-name{font-size:12px;color:#1a1a1a;margin-top:2px}
+.report-sum{font-size:14px;font-weight:bold;color:#6366f1;margin-top:4px}
+.detail-row{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.detail-info{flex:1}
+.detail-name{font-size:12px;color:#1a1a1a}
+.detail-price{font-size:13px;font-weight:bold;color:#6366f1;margin-top:2px}
+.action-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.btn-approve{background:#10b981;color:#fff;border-radius:10px;padding:12px;font-size:13px;font-weight:bold}
+.btn-reject{background:#ef4444;color:#fff;border-radius:10px;padding:12px;font-size:13px;font-weight:bold}
+.btn-send{background:#f59e0b;color:#fff;border-radius:10px;padding:12px;font-size:13px;font-weight:bold;width:100%;margin-top:10px}
+.btn-new{background:#fff;color:#6366f1;border:1px solid #6366f1;border-radius:10px;padding:12px;font-size:13px;font-weight:bold;width:100%;margin-top:8px}
+.btn-edit{background:#6366f1;color:#fff;border-radius:10px;padding:12px;font-size:13px;font-weight:bold;width:100%;margin-top:10px}
+.btn-delete{background:#ef4444;color:#fff;border-radius:10px;padding:12px;font-size:13px;font-weight:bold;width:100%;margin-top:8px}
+.btn-pdf{background:#fff;color:#1a1a1a;border:1px solid #d1d5db;border-radius:10px;padding:12px;font-size:13px;font-weight:bold;width:100%;margin-top:10px}
+.toast{position:fixed;top:60px;left:16px;right:16px;max-width:calc(100% - 32px);margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-left:4px solid #6366f1;border-radius:8px;padding:10px;z-index:50;opacity:0;transform:translateY(-20px);transition:.3s;pointer-events:none;font-size:13px;color:#1a1a1a;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-left-color:#10b981}.toast.reject{border-left-color:#ef4444}
+.filter-select,.extra-input{width:100%;padding:10px;background:#fff;border:1px solid #d1d5db;border-radius:8px;color:#1a1a1a;font-size:13px;margin-bottom:10px}
+.extra-row{display:grid;grid-template-columns:1fr 80px 30px;gap:4px;margin-bottom:4px}
+.mini-btn{background:#ef4444;color:#fff;border-radius:6px;width:30px;font-size:14px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+.modal.show{display:flex}
+.modal-box{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;max-width:380px;width:100%}
+.modal-box h3{margin-bottom:10px;font-size:15px;color:#1a1a1a}
+.modal-box textarea{width:100%;padding:8px;background:#f9fafb;border:1px solid #d1d5db;border-radius:8px;color:#1a1a1a;font-size:13px;min-height:70px;font-family:inherit}
+.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.report-controls{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-top:12px}
+.report-controls .total-sum{font-size:16px;font-weight:bold;color:#1a1a1a}
+.report-controls .total-count{font-size:11px;color:#6b7280}
+.create-btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:8px;padding:10px;font-size:13px;font-weight:bold;width:100%;margin-top:8px}
+.selection-bar{background:#eef2ff;border:1px solid #6366f1;border-radius:12px;padding:10px;margin-top:10px}
+.selection-bar.show{display:flex}
+.selection-info{font-size:13px;color:#1a1a1a;text-align:center;margin-bottom:8px}
+.selection-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn-merge-go{background:#8b5cf6;color:#fff;border-radius:8px;padding:10px;font-size:13px;font-weight:bold}
+.btn-cancel-sel{background:transparent;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:13px}
+.hidden{display:none!important}
+.reports-toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.section-title{font-size:14px;font-weight:bold;color:#1a1a1a;margin:12px 0 6px}
+.empty-state{color:#6b7280;font-size:12px;text-align:center;padding:15px}
+.work-item-header{background:#f9fafb;padding:8px;border-radius:8px;margin-bottom:8px;border-left:3px solid #6366f1}
+.work-item-date{font-size:11px;color:#6b7280;margin-bottom:2px}
+.work-item-address{font-size:11px;color:#2563eb}
+.work-item-category{font-size:10px;color:#6366f1;font-weight:bold;margin-bottom:4px;text-transform:uppercase}
+.expense-section{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px;margin-top:8px}
+.expense-label{font-size:12px;color:#9a3412;font-weight:bold;margin-bottom:6px}
+.stats-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:8px}
+.stats-value{font-size:20px;font-weight:bold;color:#6366f1}
+.stats-label{font-size:12px;color:#6b7280;margin-top:2px}
+.period-selector{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+/* Стили для редактируемых полей даты/адреса в каждой работе */
+.edit-work-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed #d1d5db}
+.edit-work-fields input{padding:6px;background:#fff;border:1px solid #d1d5db;border-radius:6px;color:#1a1a1a;font-size:11px;width:100%}
+.edit-work-fields .field-label{font-size:10px;color:#6b7280;margin-bottom:2px}
+.edit-work-fields .field-group{display:flex;flex-direction:column}
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <h1>🔧 Мастер Ворот</h1>
+  <div class="subtitle">Учёт работ монтажника</div>
+  <input class="auth-input" id="authName" type="text" placeholder="Ваше Имя">
+  <input class="auth-input" id="authEmail" type="email" placeholder="Email">
+  <input class="auth-input" id="authPass" type="password" placeholder="Пароль">
+  <button class="auth-btn" onclick="doLogin()">Войти</button>
+  <button class="auth-btn ghost" onclick="doRegister()">Зарегистрироваться</button>
+  <div class="auth-error" id="authError"></div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="header">
+    <h1 id="headerTitle">Мастер Ворот</h1>
+    <button class="header-btn" onclick="showMenu()">☰</button>
+  </div>
+  <section class="screen active" id="screenWork"><div id="workContent"></div></section>
+  <section class="screen" id="screenReports"><div id="reportsContent"></div></section>
+  <section class="screen" id="screenStats"><div id="statsContent"></div></section>
+  <section class="screen" id="screenDetail"><div id="detailContent"></div></section>
+  
+  <div class="modal" id="menuModal">
+    <div class="modal-box">
+      <h3>Меню</h3>
+      <div id="userInfo" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
+      <button class="auth-btn ghost" onclick="switchAccount()" style="width:100%;margin-bottom:6px">🔄 Сменить аккаунт</button>
+      <button class="auth-btn ghost" onclick="doLogout()" style="width:100%">Выйти</button>
+      <button class="auth-btn ghost" onclick="closeMenu()" style="width:100%;margin-top:6px">Закрыть</button>
+    </div>
+  </div>
+
+  <div class="modal" id="commentModal">
+    <div class="modal-box">
+      <h3 id="commentTitle">Комментарий</h3>
+      <textarea id="commentText"></textarea>
+      <div class="modal-btns">
+        <button class="auth-btn ghost" onclick="closeComment()">Отмена</button>
+        <button class="auth-btn" onclick="confirmComment()">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="selection-bar" id="selectionBar" style="display:none">
+    <div class="selection-info" id="selectionInfo">Выбрано: 0</div>
+    <div class="selection-btns">
+      <button class="btn-merge-go" onclick="mergeSelectedReports()">🔗 Объединить</button>
+      <button class="btn-cancel-sel" onclick="cancelSelection()">Отмена</button>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="on" id="navWork" onclick="switchTab('work')"><span class="nav-ic">🔧</span>Работа</button>
+    <button id="navReports" onclick="switchTab('reports')"><span class="nav-ic"></span>Отчёты</button>
+    <button id="navStats" onclick="switchTab('stats')" style="display:none"><span class="nav-ic">📊</span>Статистика</button>
+  </nav>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBy33wmCvITTIoFwuNlS9ygWqTOfWnVuhY",
+  authDomain: "mastervorot-65e51.firebaseapp.com",
+  projectId: "mastervorot-65e51",
+  storageBucket: "mastervorot-65e51.firebasestorage.app",
+  messagingSenderId: "1021107601225",
+  appId: "1:1021107601225:web:0473cd4e44cd684cd06498",
+  measurementId: "G-J2X85SXKKC"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(), db = firebase.firestore();
+
+const BOSS_EMAIL = "yurec_1981@mail.ru".toLowerCase();
+const ROLES = { [BOSS_EMAIL]: "boss" };
+
+let currentUser = null, currentRole = null, currentTab = 'work', currentCategory = null;
+let selectedWorks = {}, extraWorks = [], allReports = [], filterWorker = 'all';
+let commentAction = null, commentReportId = null, editingReportId = null;
+let selectionMode = false, selectedReportIds = [];
+let workerName = '';
+let activeDraftId = null;
+
+const PRICE = {
+  "Доставка и ТО": [
+    {n:"Выезд на дефектовку и мелкий ремонт, доставка в пределах 100км (+2000 за каждые следующие 100км)",p:2000},
+    {n:"Выезд на монтаж ворот, роллет и т.д. (+2000 за каждые следующие 100 км)",p:2000},
+    {n:"ТО Бытовых ворот",p:5000},
+    {n:"ТО Промышленных ворот",p:8000},
+    {n:"Суточные (если выезжают на объект далее 200 км)",p:5000}
+  ],
+  "Ремонты": [
+    {n:"Замена ручки на калитке ворот",p:800},{n:"Замена ролика",p:200},{n:"Замена, рихтовка петли",p:200},
+    {n:"Замена бокового кронштейна",p:200},{n:"Регулировка роликов после мех. повреждения за 1 шт",p:200},
+    {n:"Рихтовка панелей",p:2000},{n:"Замена устройства защиты от разрыва пружины (храповик)",p:3000},
+    {n:"Замена устройства защиты от разрыва троса",p:2000},{n:"Рихтовка устройства защиты от разрыва троса",p:2000},
+    {n:"Установка светопрозрачной вставки",p:1500},{n:"Демонтаж вставки с панели б/у и установка на новую",p:2500},
+    {n:"Замена нижнего алюминиевого профиля",p:3000},{n:"Рихтовка нижнего алюминиевого профиля",p:2000},
+    {n:"Замена верхнего алюминиевого профиля",p:1500},{n:"Замена верхнего уплотнителя",p:1000},
+    {n:"Замена нижнего уплотнителя",p:1500},{n:"Замена бокового уплотнителя",p:2000},
+    {n:"Замена вала на гаражных воротах",p:5000},{n:"Замена вала на промышленных воротах",p:10000},
+    {n:"Замена муфты вала",p:2000},{n:"Замена подшипника на валу (в центре 1000р, за барабанами 2000)",p:1000},
+    {n:"Замена торсионной пружины на гаражных воротах",p:2000},
+    {n:"Замена торсионной пружины на пром. воротах стандартный монтаж",p:5000},
+    {n:"Замена торсионной пружины на пром. воротах высокий монтаж вал сверху",p:6500},
+    {n:"Замена барабана ворот 1 сторона",p:3000},{n:"Замена направляющей (в сборе) гаражные",p:3000},
+    {n:"Замена участка направляющей длиной 1 метр",p:1000},{n:"Замена пружинного амортизатора",p:1000},
+    {n:"Замена калиточной петли",p:300},{n:"Замена ручного цепного привода (РЦП)",p:2000},
+    {n:"Настройка концевиков привода",p:1500},{n:"Замена платы блока управления",p:1000},
+    {n:"Замена блока управления",p:1500},{n:"Замена нижней панели гаражных ворот (+2000 за калитку)",p:5000},
+    {n:"Замена второй или другой панели гаражных ворот",p:2000},
+    {n:"Замена нижней панели промышленных ворот (+2000 за калитку)",p:10000},
+    {n:"Замена второй или другой панели промышленных ворот",p:5000},
+    {n:"Замена тросов гаражных ворот одна сторона",p:3000},
+    {n:"Замена троса промышленных ворот (стандартный монтаж) Без троса",p:5000},
+    {n:"Замена троса промышленных ворот (высокий, вертикальный монтаж) Без троса",p:6000},
+    {n:"Установка шпонки на вал, привод",p:500},{n:"Протяжка, замена кабеля с блока управления до привода",p:1000},
+    {n:"Замена аварийного редуктора электропривода",p:1000},
+    {n:"Демонтаж боковых накладок с панели б/у и монтаж на новую панель",p:2000},
+    {n:"Аварийное опускание ворот",p:2000},{n:"Установка и подключение датчика калитки",p:1500},
+    {n:"Установка и подключение светофорной лампы на ворота",p:1000},
+    {n:"Рихтовка и покраска откосов ворот после мех. повреждения",p:2000},
+    {n:"Замена откосов ворот после мех. повреждения",p:4000},{n:"Замена нижнего кронштейна",p:1500}
+  ],
+  "Гаражные ворота": [
+    {n:"Монтаж ворот (стандартный) - если высокий/вертикальный +20%",p:9000,hasArea:true,mountType:'standard'},
+    {n:"Монтаж для ворот СВЫШЕ 9 м² (за м²) - если высокий +20%",p:1000,hasArea:true,mountType:'standard'},
+    {n:"Демонтаж ворот",p:4000},
+    {n:"Калитка",p:3000},
+    {n:"Привод потолочный",p:3000,drive:'ceiling'},
+    {n:"Фальш панель",p:2000},{n:"Доп.работы установка на керамограните или плитке",p:3000},
+    {n:"Фотоэлемент, лампа, разблокиратор (без проводки) - за каждый",p:1500},
+    {n:"Переделка ворот только по ширине панели (Распил)",p:4000},
+    {n:"Подготовка проема 2 трубы/уголка по горизонтали или Н-образное (без материала)",p:5000},
+    {n:"Подготовка проема 1 труба/уголок или пристенок 1 (без материала)",p:2500},
+    {n:"Покраска труб для проема (без материала)",p:1000},
+    {n:"Проводка питания или под фотоэлементы (за 1 м) без учета материала",p:300,perMeter:true,meterName:"м проводки"},
+    {n:"Проводка ШТРОБИТЬ или в гофре (за 1 м) без учета материала",p:500,perMeter:true,meterName:"м штробы"}
+  ],
+  "Промышленные ворота": [
+    {n:"Монтаж (стандартный) до 9 м² - если высокий/вертикальный +20%",p:13000,hasArea:true,mountType:'standard'},
+    {n:"Монтаж СВЫШЕ 9 м² (за м²) - если высокий/вертикальный +20%",p:1500,hasArea:true,mountType:'standard'},
+    {n:"Демонтаж пром. ворот до 9 м²",p:5000},
+    {n:"Фотоэлемент, лампа, разблокиратор (без проводки) - за каждый",p:1500},
+    {n:"РЦП",p:2000},{n:"Вальный привод",p:4000,drive:'shaft'},{n:"Калитка",p:3000},{n:"Фальш панель",p:2000},
+    {n:"Установка светофора",p:2000},
+    {n:"Обрамление (стандартный монтаж) +2000 за вертикальный (без материала)",p:10000},
+    {n:"Покраска проема (без материала)",p:4000},{n:"Переделка (распил) + к монтажу",p:4000},
+    {n:"Проводка (за 1 м) без учета материала",p:300,perMeter:true,meterName:"м проводки"},
+    {n:"Проводка ШТРОБИТЬ или в гофре (за 1 м) без учета материала",p:500,perMeter:true,meterName:"м штробы"},
+    {n:"Монтаж противопожарных ворот стандарт (без автоматики и калитки)",p:20000},
+    {n:"Монтаж противопожарных высокий/вертикальный (за м²)",p:4000},
+    {n:"Монтаж скоростных ворот",p:30000}
+  ],
+  "Шлагбаум": [
+    {n:"Монтаж шлагбаума (на готовый фундамент)",p:6000},
+    {n:"Монтаж шлагбаума с фундаментом (со швеллером)",p:15000},
+    {n:"Заливка фундамента (откопать и пескобетоном) без монтажа",p:10000},
+    {n:"Фотоэлемент, лампа, разблокиратор (без проводки) - за каждый",p:1500},
+    {n:"Установка стойки стационарной с бетонированием",p:1000},
+    {n:"Демонтаж старого шлагбаума",p:2500},
+    {n:"Проводка (за 1 м) без учета материала",p:300,perMeter:true,meterName:"м проводки"},
+    {n:"Проводка ШТРОБИТЬ или в гофре (за 1 м) без учета материала",p:500,perMeter:true,meterName:"м штробы"},
+    {n:"GSM модуль подключить + запрограммировать",p:2000},{n:"Замена стрелы",p:2000}
+  ],
+  "Распашные ворота": [
+    {n:"Монтаж заводских распашных (с заполнением)",p:25000},
+    {n:"Комплект автоматики распашной с воротами (без проводки)",p:8000},
+    {n:"Привод распашной (отдельно на ворота клиента, без проводки)",p:10000,drive:'swing'},
+    {n:"Фотоэлемент, лампа, разблокиратор (без проводки) - за каждый",p:1500},
+    {n:"Обрамление (Бандаж) из уголка/труб",p:6000},
+    {n:"Демонтаж распашных ворот (срезать петли), без вывоза мусора",p:10000}
+  ],
+  "Откатные ворота": [
+    {n:"Монтаж заводских откатных ворот",p:25000},
+    {n:"Привод откатных ворот",p:5000,drive:'sliding'},
+    {n:"Зубчатая рейка до 6 шт",p:2000},
+    {n:"Фотоэлемент, лампа, разблокиратор (без проводки) - за каждый",p:1500},
+    {n:"Наценка за комбинированное заполнение",p:5000},
+    {n:"Заборная секция Алютех до 5000 мм",p:5000},
+    {n:"Демонтаж откатных сварных, без вывоза мусора",p:12000},
+    {n:"Подготовка фундамента до 4500 мм проема (16 швеллер)",p:20000},
+    {n:"Подготовка фундамента до 5000 мм проема (20 швеллер)",p:25000},
+    {n:"Подготовка фундамента до 6000 мм проема (20 швеллер)",p:35000},
+    {n:"Яму под фундамент + лунки мотобуром + установить станину/сваи",p:10000},
+    {n:"Фундамент залить (пескобетон)",p:10000}
+  ],
+  "Калитка": [
+    {n:"Калитка заводская любое заполнение",p:10000},
+    {n:"Защелка, электромагнитный замок (установить)",p:1500},
+    {n:"Доводчик",p:1500},{n:"Демонтаж старой калитки (срезать петли)",p:5000}
+  ],
+  "Рольставни 45": [
+    {n:"Монтаж одной роллеты (до 2000х2000)",p:8000},
+    {n:"Доплата за автоматику (клавиша/ключ-кнопка) за каждое устройство",p:1000},
+    {n:"Окно/дверь ширина до 2000 мм (от 2х штук)",p:6000},
+    {n:"Окно/дверь ширина 2001-3000 мм (от 2х штук)",p:8000},
+    {n:"Дверь/хоз.блок ширина 3001-4000 мм",p:10000},
+    {n:"Если выше 2000мм, прибавляем за каждые 500мм",p:500},
+    {n:"Демонтаж роллет профиль 40 и 45, без вывоза мусора",p:2500},
+    {n:"Подготовка проёма (без материала)",p:2000},
+    {n:"Подготовка проема 1 труба/уголок или пристенок 1 (без материала)",p:1000},
+    {n:"Покраска проема (без материала)",p:1000}
+  ],
+  "Рольставни 55": [
+    {n:"Доплата за автоматику за каждое устройство",p:1000},
+    {n:"Окно/дверь ширина до 2000 мм",p:7000},
+    {n:"Окно/дверь ширина 2001-3000 мм",p:9000},
+    {n:"Дверь ширина 3001-4000 мм",p:11000},
+    {n:"Если выше 2000мм, прибавляем за каждые 500мм",p:500},
+    {n:"Подготовка проёма БЕЗ УЧЕТА МАТЕРИАЛА",p:4000},
+    {n:"Покраска проема (без материала)",p:1500},
+    {n:"Подготовка проема 1 труба/уголок или пристенок 1 (без материала)",p:2000},
+    {n:"Демонтаж роллет профиль 55 и 555, без вывоза мусора",p:4000}
+  ],
+  "Рольворота 77": [
+    {n:"Ширина за 1 Кв м",p:1500},
+    {n:"Доплата за автоматику за каждое устройство",p:1000},
+    {n:"Покраска проема",p:2000},{n:"Переделка по ширине (Распил)",p:4000},
+    {n:"Переделка по высоте (подрезать направляющие)",p:1000},
+    {n:"Демонтаж роллет профиль 77, без вывоза мусора",p:8000},
+    {n:"Роллворота Ролмастер (ночные + согласовать)",p:15000}
+  ],
+  "Перегрузочная техника": [
+    {n:"Уравнительные платформы (доклевеллеры)",p:15000},
+    {n:"Герметизаторы проема (докшелтеры)",p:10000},
+    {n:"Платформа под перегрузку",p:16000},
+    {n:"Тамбур сборный болтовой",p:18000},{n:"Тамбур сварной",p:27000},
+    {n:"Скоростные ворота",p:30000},{n:"Бампер резиновый",p:2000},
+    {n:"Направляющие для колес",p:4000}
+  ],
+  "ТО Ворота": [
+    {n:"ПРОМЫШЛЕННЫЕ ВОРОТА ДО 3500ММ",p:10000},
+    {n:"ПРОМЫШЛЕННЫЕ ВОРОТА ДО 6000ММ",p:10000},
+    {n:"ТО Роллворота (Ролмастер) (ночные +10000)",p:5000},
+    {n:"ТО Гаражные",p:5000},{n:"ТО Рольставни (дверь, окно)",p:2000},
+    {n:"ТО Шлагбаум",p:4000},
+    {n:"ТО ОТКАТНЫХ - РАСПАШНЫХ СВАРНЫЕ И ЗАВОДСКИЕ",p:5000}
+  ]
+};
+
+const ICONS = {
+  "Доставка и ТО": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><g><animateTransform attributeName="transform" type="translate" values="-3,0;3,0;-3,0" dur="2s" repeatCount="indefinite"/><path d="M 15 70 L 15 55 Q 15 50 20 50 L 30 50 L 40 35 Q 45 30 55 30 L 70 30 Q 78 30 82 38 L 90 50 Q 95 52 95 58 L 95 70 Q 95 75 90 75 L 85 75 A 8 8 0 1 0 69 75 L 41 75 A 8 8 0 1 0 25 75 L 15 75 Q 10 75 10 70 Z" fill="#3b82f6" stroke="#1e3a8a" stroke-width="2"/><circle cx="33" cy="75" r="6" fill="#374151" stroke="#000" stroke-width="1.5"/><circle cx="77" cy="75" r="6" fill="#374151" stroke="#000" stroke-width="1.5"/><path d="M 42 35 L 42 50 L 55 50 L 55 35 Z" fill="#bfdbfe" stroke="#1e3a8a" stroke-width="1.5"/><path d="M 58 35 L 58 50 L 78 50 L 72 38 Q 70 35 65 35 Z" fill="#bfdbfe" stroke="#1e3a8a" stroke-width="1.5"/></g><line x1="0" y1="85" x2="100" y2="85" stroke="#9ca3af" stroke-width="1" stroke-dasharray="4 2"><animate attributeName="stroke-dashoffset" from="0" to="-12" dur="0.5s" repeatCount="indefinite"/></line></svg>`,
+  "Ремонты": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><g transform="translate(50,50)"><animateTransform attributeName="transform" type="rotate" values="-40;40;-40" dur="1.5s" repeatCount="indefinite" additive="sum"/><rect x="-4" y="-35" width="8" height="45" rx="2" fill="#94a3b8"/><rect x="-10" y="-40" width="20" height="10" rx="2" fill="#cbd5e1"/><circle cx="0" cy="15" r="8" fill="#6b7280"/><circle cx="0" cy="15" r="3" fill="#374151"/></g></svg>`,
+  "Гаражные ворота": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="20" y="25" width="60" height="60" fill="#f3f4f6"/><g><rect x="21" y="70" width="58" height="14" fill="#d1d5db"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.35;0.5;0.85;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="21" y="56" width="58" height="14" fill="#9ca3af"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.4;0.5;0.8;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="21" y="42" width="58" height="14" fill="#6b7280"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.45;0.5;0.75;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="21" y="28" width="58" height="14" fill="#4b5563"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.5;0.5;0.7;0.9;1" dur="4s" repeatCount="indefinite"/></g><g opacity="0"><text x="50" y="52" font-size="7" font-weight="bold" text-anchor="middle" fill="#2563eb" font-family="Arial">АВТО-</text><text x="50" y="62" font-size="7" font-weight="bold" text-anchor="middle" fill="#2563eb" font-family="Arial">ВОРОТА</text><text x="50" y="72" font-size="6" text-anchor="middle" fill="#f59e0b" font-family="Arial">МОСКВА</text><animate attributeName="opacity" values="0;0;1;1;1;0;0" keyTimes="0;0.3;0.35;0.5;0.85;0.9;1" dur="4s" repeatCount="indefinite"/></g></svg>`,
+  "Промышленные ворота": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="10" y="20" width="80" height="65" fill="#f3f4f6"/><g><rect x="11" y="72" width="78" height="12" fill="#d1d5db"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.35;0.5;0.85;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="11" y="60" width="78" height="12" fill="#9ca3af"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.4;0.5;0.8;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="11" y="48" width="78" height="12" fill="#6b7280"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.45;0.5;0.75;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="11" y="36" width="78" height="12" fill="#4b5563"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.5;0.5;0.7;0.9;1" dur="4s" repeatCount="indefinite"/></g><g><rect x="11" y="24" width="78" height="12" fill="#374151"/><animate attributeName="opacity" values="1;1;0;0;0;1;1" keyTimes="0;0.3;0.5;0.5;0.7;0.9;1" dur="4s" repeatCount="indefinite"/></g><g opacity="0"><text x="50" y="52" font-size="6" font-weight="bold" text-anchor="middle" fill="#2563eb" font-family="Arial">АВТО-</text><text x="50" y="60" font-size="6" font-weight="bold" text-anchor="middle" fill="#2563eb" font-family="Arial">ВОРОТА</text><text x="50" y="68" font-size="5" text-anchor="middle" fill="#f59e0b" font-family="Arial">МОСКВА</text><animate attributeName="opacity" values="0;0;1;1;1;0;0" keyTimes="0;0.3;0.35;0.5;0.85;0.9;1" dur="4s" repeatCount="indefinite"/></g></svg>`,
+  "Шлагбаум": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="45" y="60" width="10" height="25" fill="#6b7280"/><g><animateTransform attributeName="transform" type="rotate" values="-90 50 65;0 50 65;-90 50 65" dur="3s" repeatCount="indefinite"/><rect x="50" y="62" width="40" height="5" rx="2" fill="#ef4444"/><rect x="55" y="62" width="8" height="5" fill="#fff"/><rect x="70" y="62" width="8" height="5" fill="#fff"/></g><line x1="0" y1="85" x2="100" y2="85" stroke="#9ca3af" stroke-width="1"/></svg>`,
+  "Распашные ворота": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="20" y="30" width="60" height="55" fill="#f3f4f6"/><line x1="50" y1="30" x2="50" y2="85" stroke="#9ca3af" stroke-width="1"/><rect x="21" y="31" width="28" height="53" fill="#3b82f6" stroke="#6b7280" stroke-width="0.5"/><rect x="51" y="31" width="28" height="53" fill="#3b82f6" stroke="#6b7280" stroke-width="0.5"/><circle cx="21" cy="38" r="2" fill="#fbbf24"/><circle cx="21" cy="77" r="2" fill="#fbbf24"/><circle cx="79" cy="38" r="2" fill="#fbbf24"/><circle cx="79" cy="77" r="2" fill="#fbbf24"/><circle cx="47" cy="57" r="1.5" fill="#fbbf24"/><circle cx="53" cy="57" r="1.5" fill="#fbbf24"/><line x1="0" y1="85" x2="100" y2="85" stroke="#9ca3af" stroke-width="0.6" opacity="0.5"/></svg>`,
+  "Откатные ворота": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="15" y="30" width="70" height="55" fill="#f3f4f6"/><line x1="15" y1="85" x2="85" y2="85" stroke="#9ca3af" stroke-width="1"/><line x1="15" y1="30" x2="15" y2="85" stroke="#9ca3af" stroke-width="1.5"/><g><animateTransform attributeName="transform" type="translate" values="0,0;-55,0;0,0" dur="4s" repeatCount="indefinite"/><rect x="20" y="32" width="60" height="52" fill="#3b82f6" stroke="#6b7280" stroke-width="0.5"/><line x1="30" y1="32" x2="30" y2="84" stroke="#1e3a8a" stroke-width="0.5"/><line x1="40" y1="32" x2="40" y2="84" stroke="#1e3a8a" stroke-width="0.5"/><line x1="50" y1="32" x2="50" y2="84" stroke="#1e3a8a" stroke-width="0.5"/><line x1="60" y1="32" x2="60" y2="84" stroke="#1e3a8a" stroke-width="0.5"/><line x1="70" y1="32" x2="70" y2="84" stroke="#1e3a8a" stroke-width="0.5"/><circle cx="25" cy="82" r="3" fill="#374151"/><circle cx="75" cy="82" r="3" fill="#374151"/></g></svg>`,
+  "Калитка": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="25" y="30" width="50" height="55" fill="#f3f4f6"/><line x1="25" y1="30" x2="25" y2="85" stroke="#9ca3af" stroke-width="1.5"/><rect x="26" y="31" width="48" height="53" fill="#10b981" stroke="#6b7280" stroke-width="0.5"/><circle cx="26" cy="38" r="2" fill="#fbbf24"/><circle cx="26" cy="77" r="2" fill="#fbbf24"/><circle cx="68" cy="57" r="2" fill="#fbbf24"/><line x1="0" y1="85" x2="100" y2="85" stroke="#9ca3af" stroke-width="0.6" opacity="0.5"/></svg>`,
+  "Рольставни 45": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="30" y="25" width="40" height="60" fill="#f3f4f6"/><rect x="28" y="22" width="44" height="8" rx="2" fill="#6b7280"/><g><animate attributeName="height" values="55;55;5;5;55" keyTimes="0;0.3;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="30;30;25;25;30" keyTimes="0;0.3;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><rect x="31" y="30" width="38" height="55" fill="#9ca3af"/><line x1="31" y1="33" x2="69" y2="33" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="36" x2="69" y2="36" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="39" x2="69" y2="39" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="42" x2="69" y2="42" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="45" x2="69" y2="45" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="48" x2="69" y2="48" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="51" x2="69" y2="51" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="54" x2="69" y2="54" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="57" x2="69" y2="57" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="60" x2="69" y2="60" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="63" x2="69" y2="63" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="66" x2="69" y2="66" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="69" x2="69" y2="69" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="72" x2="69" y2="72" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="75" x2="69" y2="75" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="78" x2="69" y2="78" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="81" x2="69" y2="81" stroke="#6b7280" stroke-width="0.3"/></g></svg>`,
+  "Рольставни 55": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="30" y="25" width="40" height="60" fill="#f3f4f6"/><rect x="26" y="22" width="48" height="10" rx="2" fill="#6b7280"/><g><animate attributeName="height" values="55;55;5;5;55" keyTimes="0;0.3;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="30;30;25;25;30" keyTimes="0;0.3;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><rect x="31" y="30" width="38" height="55" fill="#9ca3af"/><line x1="31" y1="33" x2="69" y2="33" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="36" x2="69" y2="36" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="39" x2="69" y2="39" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="42" x2="69" y2="42" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="45" x2="69" y2="45" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="48" x2="69" y2="48" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="51" x2="69" y2="51" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="54" x2="69" y2="54" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="57" x2="69" y2="57" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="60" x2="69" y2="60" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="63" x2="69" y2="63" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="66" x2="69" y2="66" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="69" x2="69" y2="69" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="72" x2="69" y2="72" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="75" x2="69" y2="75" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="78" x2="69" y2="78" stroke="#6b7280" stroke-width="0.3"/><line x1="31" y1="81" x2="69" y2="81" stroke="#6b7280" stroke-width="0.3"/></g></svg>`,
+  "Рольворота 77": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="20" y="25" width="60" height="60" fill="#f3f4f6"/><rect x="18" y="22" width="64" height="10" rx="2" fill="#6b7280"/><g><animate attributeName="height" values="55;55;5;5;55" keyTimes="0;0.3;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><animate attributeName="y" values="30;30;25;25;30" keyTimes="0;0.3;0.5;0.8;1" dur="4s" repeatCount="indefinite"/><rect x="21" y="30" width="58" height="55" fill="#9ca3af"/><line x1="21" y1="33" x2="79" y2="33" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="36" x2="79" y2="36" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="39" x2="79" y2="39" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="42" x2="79" y2="42" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="45" x2="79" y2="45" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="48" x2="79" y2="48" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="51" x2="79" y2="51" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="54" x2="79" y2="54" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="57" x2="79" y2="57" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="60" x2="79" y2="60" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="63" x2="79" y2="63" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="66" x2="79" y2="66" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="69" x2="79" y2="69" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="72" x2="79" y2="72" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="75" x2="79" y2="75" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="78" x2="79" y2="78" stroke="#6b7280" stroke-width="0.3"/><line x1="21" y1="81" x2="79" y2="81" stroke="#6b7280" stroke-width="0.3"/></g></svg>`,
+  "Перегрузочная техника": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><rect x="15" y="25" width="70" height="55" fill="#d1d5db" stroke="#9ca3af" stroke-width="0.5"/><rect x="15" y="25" width="70" height="12" fill="#9ca3af"/><rect x="20" y="40" width="25" height="35" fill="#6b7280"/><rect x="55" y="40" width="25" height="35" fill="#6b7280"/><rect x="20" y="40" width="25" height="8" fill="#4b5563"/><rect x="55" y="40" width="25" height="8" fill="#4b5563"/><rect x="15" y="78" width="70" height="4" fill="#1f2937"/><rect x="20" y="82" width="4" height="4" fill="#1f2937"/><rect x="76" y="82" width="4" height="4" fill="#1f2937"/><g><animate attributeName="y" values="40;40;55;55;40" dur="3s" repeatCount="indefinite"/><rect x="35" y="40" width="30" height="6" fill="#f59e0b"/><line x1="40" y1="46" x2="40" y2="70" stroke="#6b7280" stroke-width="1.5"/><line x1="60" y1="46" x2="60" y2="70" stroke="#6b7280" stroke-width="1.5"/></g><text x="50" y="22" font-size="4" text-anchor="middle" fill="#4b5563" font-family="Arial">ALUTECH</text></svg>`,
+  "ТО Ворота": `<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5e7eb"/><g><animateTransform attributeName="transform" type="rotate" values="-30;30;-30" dur="1s" repeatCount="indefinite"/><rect x="30" y="30" width="8" height="35" rx="2" fill="#94a3b8"/><rect x="25" y="25" width="18" height="8" rx="2" fill="#cbd5e1"/></g><g><animateTransform attributeName="transform" type="rotate" values="20;-20;20" dur="1.2s" repeatCount="indefinite"/><rect x="55" y="35" width="6" height="30" rx="1" fill="#f59e0b"/><rect x="52" y="30" width="12" height="8" rx="1" fill="#fbbf24"/></g><line x1="0" y1="85" x2="100" y2="85" stroke="#9ca3af" stroke-width="0.6" opacity="0.5"/></svg>`
+};
+
+function showToast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type||'');setTimeout(()=>t.className='toast',3000)}
+function pluralWork(n){const n10=n%10,n100=n%100;if(n10===1&&n100!==11)return'работа';if(n10>=2&&n10<=4&&(n100<10||n100>=20))return'работы';return'работ'}
+
+function calculateItemPrice(item) {
+  if (item.hasArea) {
+    const area = parseFloat(item.area) || 0;
+    if (area <= 9 || area === 0) return item.p;
+    return item.p * area;
+  }
+  if (item.perMeter) return item.p * (item.meters || 1);
+  return item.p;
+}
+
+function doLogin(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  document.getElementById('authError').textContent='';
+  if(!email||!pass){document.getElementById('authError').textContent='Заполни email и пароль';return}
+  auth.signInWithEmailAndPassword(email,pass).catch(e=>{document.getElementById('authError').textContent=e.code==='auth/invalid-credential'?'Неверный логин или пароль':e.message})
+}
+
+function doRegister(){
+  const name=document.getElementById('authName').value.trim();
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  document.getElementById('authError').textContent='';
+  if(!name){document.getElementById('authError').textContent='Укажи своё имя';return}
+  if(!email||!pass){document.getElementById('authError').textContent='Заполни email и пароль';return}
+  const emailLower = email.toLowerCase();
+  const role = (emailLower === BOSS_EMAIL) ? "boss" : "worker";
+  auth.createUserWithEmailAndPassword(email,pass).then(cred=>{
+    return db.collection('workers').doc(cred.user.uid).set({
+      email: emailLower, name, role: role,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }).then(()=>{
+    showToast('Регистрация успешна','ok');
+    setTimeout(()=>{ auth.signInWithEmailAndPassword(email, pass).catch(e=>{ showToast('Ошибка входа: '+e.message,'reject'); }); }, 1000);
+  }).catch(e=>{document.getElementById('authError').textContent=e.message})
+}
+
+function doLogout(){auth.signOut();closeMenu()}
+function switchAccount(){closeMenu();auth.signOut()}
+
+auth.onAuthStateChanged(async user=>{
+  if(!user){
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+    currentUser=null;currentRole=null;workerName='';activeDraftId=null;
+    return
+  }
+  currentUser=user;
+  const emailLower = user.email ? user.email.toLowerCase() : '';
+  currentRole = ROLES[emailLower] || 'worker';
+  try{
+    const doc=await db.collection('workers').doc(user.uid).get();
+    if(doc.exists){
+      const data = doc.data();
+      workerName = data.name || user.email.split('@')[0];
+      if(data.role) currentRole = data.role;
+    }else{
+      workerName=user.email.split('@')[0];
+      db.collection('workers').doc(user.uid).set({
+        email:emailLower, name:workerName, role:currentRole,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  }catch(e){ workerName=user.email.split('@')[0]; }
+  
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userInfo').innerHTML='<b>'+workerName+'</b><br>'+user.email+'<br>Роль: '+(currentRole==='boss'?'👔 Руководитель':' Монтажник');
+  
+  if (currentRole === 'worker') {
+    document.getElementById('navStats').style.display = 'flex';
+  }
+  
+  if (currentRole === 'boss') {
+    document.getElementById('navWork').style.display = 'none';
+    document.getElementById('navStats').style.display = 'none';
+    currentTab = 'reports';
+  } else {
+    document.getElementById('navWork').style.display = 'flex';
+  }
+  
+  subscribeReports();
+  renderCurrentScreen()
+});
+
+function subscribeReports(){db.collection('reports').orderBy('createdAt','desc').onSnapshot(snap=>{const prevCount=allReports.length;allReports=[];snap.forEach(d=>allReports.push({id:d.id,...d.data()}));if(prevCount>0&&allReports.length>prevCount&&currentRole==='boss'){showToast('🔔 Новый отчёт на проверке','ok')}updateActiveDraftId();renderCurrentScreen()})}
+
+function updateActiveDraftId(){
+  if(currentRole!=='worker')return;
+  const myDrafts=allReports.filter(r=>r.workerEmail===currentUser.email&&r.status==='draft');
+  activeDraftId = myDrafts.length>0 ? myDrafts[0].id : null;
+}
+
+function switchTab(tab){
+  if (currentRole === 'boss' && (tab === 'work' || tab === 'stats')) return;
+  currentTab=tab;
+  cancelSelection();
+  document.getElementById('navWork').classList.toggle('on',tab==='work');
+  document.getElementById('navReports').classList.toggle('on',tab==='reports');
+  document.getElementById('navStats').classList.toggle('on',tab==='stats');
+  document.getElementById('screenWork').classList.remove('active');
+  document.getElementById('screenReports').classList.remove('active');
+  document.getElementById('screenStats').classList.remove('active');
+  document.getElementById('screenDetail').classList.remove('active');
+  if(tab==='work'){
+    document.getElementById('screenWork').classList.add('active');
+    renderWork();
+  }else if(tab==='reports'){
+    document.getElementById('screenReports').classList.add('active');
+    renderReports();
+  }else if(tab==='stats'){
+    document.getElementById('screenStats').classList.add('active');
+    renderStats();
+  }
+}
+
+function renderCurrentScreen(){if(currentTab==='work')renderWork();else if(currentTab==='reports')renderReports();else if(currentTab==='stats')renderStats()}
+
+function renderWork(){
+  const content=document.getElementById('workContent');
+  if(!currentCategory){
+    let html='<div class="cat-grid">';
+    Object.keys(PRICE).forEach(cat=>{html+='<div class="cat-card" onclick="openCategory(\''+cat.replace(/'/g,"\\'")+'\')"><div class="cat-preview">'+(ICONS[cat]||'')+'</div><div class="cat-name">'+cat+'</div></div>'});
+    html+='</div>';
+    content.innerHTML=html;
+    return
+  }
+  const works=PRICE[currentCategory];const selected=selectedWorks[currentCategory]||[];const selectedNames=new Set(selected.map(w=>w.n));
+  let html='<button class="header-btn" onclick="backToCats()" style="margin-bottom:10px">← Назад</button>';
+  html+='<h2 style="margin-bottom:10px;font-size:16px;color:#1a1a1a">'+currentCategory+'</h2>';
+  html+='<select class="filter-select" onchange="selectWorkByIndex(this.value)" id="workSelect"><option value="">— Выбрать работу —</option>';
+  works.forEach((w,i)=>{html+='<option value="'+i+'" '+(selectedNames.has(w.n)?'disabled':'')+'>'+w.n+' · '+w.p.toLocaleString('ru-RU')+' ₽'+(w.perMeter?' (за 1 м)':'')+'</option>'});
+  html+='</select><div id="selectedWorksList"></div>';
+  html+='<h3 class="section-title">Дополнительные работы</h3><div id="extraWorksList"></div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 80px;gap:4px;margin-top:6px"><input class="extra-input" id="extraName" placeholder="Название" style="margin:0"><input class="extra-input" id="extraPrice" type="number" placeholder="Цена" style="margin:0"></div>';
+  html+='<button class="header-btn" onclick="addExtraWork()" style="width:100%;margin-top:6px">+ Добавить доп. работу</button>';
+  
+  // При редактировании показываем подсказку
+  if(editingReportId){
+    html+='<div style="background:#eef2ff;border:1px solid #6366f1;border-radius:8px;padding:8px;margin-top:10px;font-size:12px;color:#6366f1">✏️ Режим редактирования: меняйте дату/адрес для каждой работы отдельно</div>';
+  }
+  
+  html+='<div class="report-controls">';
+  html+='<div style="font-size:12px;color:#6b7280;margin-bottom:6px">📝 Дата и адрес для НОВЫХ работ:</div>';
+  html+='<input type="date" id="workDate" class="extra-input" style="margin:0">';
+  html+='<input type="text" id="workAddress" class="extra-input" placeholder="📍 Адрес выполнения работ" style="margin:0">';
+  html+='<div style="margin-top:8px"><div class="total-count" id="totalCount">0 работ</div><div class="total-sum" id="totalSum">0 ₽</div></div>';
+  html+='<button class="create-btn" id="createReportBtn" onclick="addToReport()">➕ Добавить в отчёт</button>';
+  html+='</div>';
+  
+  content.innerHTML=html;
+  renderSelectedWorks();
+  renderExtraWorks();
+  updateTotal();
+  const dateInput=document.getElementById('workDate');
+  if(!dateInput.value)dateInput.value=new Date().toISOString().split('T')[0];
+  
+  if(editingReportId){
+    document.getElementById('createReportBtn').textContent='💾 Сохранить изменения';
+  }else if(activeDraftId){
+    const draft=allReports.find(r=>r.id===activeDraftId);
+    if(draft){
+      document.getElementById('createReportBtn').textContent='➕ Добавить в отчёт ('+draft.items.length+' работ, '+draft.total.toLocaleString('ru-RU')+' ₽)';
+    }
+  }else{
+    document.getElementById('createReportBtn').textContent='➕ Создать новый отчёт';
+  }
+}
+
+function openCategory(cat){currentCategory=cat;if(!selectedWorks[cat])selectedWorks[cat]=[];renderWork()}
+function backToCats(){currentCategory=null;renderWork()}
+
+function selectWorkByIndex(idx){
+  if(idx==='')return;
+  const i=parseInt(idx);
+  const work=PRICE[currentCategory][i];
+  if(!selectedWorks[currentCategory])selectedWorks[currentCategory]=[];
+  if(!selectedWorks[currentCategory].find(w=>w.n===work.n)){
+    const sel={...work};
+    if(work.perMeter){sel.meters=1}
+    if(work.hasArea){sel.area=0;sel.mountType=work.mountType||'standard'}
+    sel.qty=1;
+    // Устанавливаем текущие значения из формы
+    const dateInput=document.getElementById('workDate');
+    const addressInput=document.getElementById('workAddress');
+    sel.workDate=dateInput?dateInput.value:new Date().toISOString().split('T')[0];
+    sel.workAddress=addressInput?addressInput.value.trim():'';
+    selectedWorks[currentCategory].push(sel)
+  }
+  document.getElementById('workSelect').value='';
+  renderWork()
+}
+
+function renderSelectedWorks(){
+  const list=document.getElementById('selectedWorksList');
+  if(!list)return;
+  const works=selectedWorks[currentCategory]||[];
+  if(!works.length){list.innerHTML='<div class="empty-state">Работы не выбраны</div>';return}
+  let html='';
+  works.forEach((w,i)=>{
+    const price=calculateItemPrice(w)*(w.qty||1);
+    html+='<div class="work-item"><div class="work-info"><div class="work-name">'+w.n+'</div><div class="work-price">'+price.toLocaleString('ru-RU')+' ₽</div>';
+    if(w.perMeter){html+='<div class="meter-input"><span>Количество:</span><input type="number" value="'+w.meters+'" min="0.5" step="0.5" onchange="updateMeters('+i+',this.value)"><span>'+w.meterName+'</span></div>'}
+    if(w.hasArea){html+='<div class="area-input"><span>Площадь (м²):</span><input type="number" value="'+(w.area||0)+'" min="0" step="0.5" onchange="updateArea('+i+',this.value)"><span>м²</span></div>';if(w.mountType==='high'){html+='<div style="font-size:11px;color:#f59e0b;margin-top:4px">⚡ Высокий монтаж (×1.2)</div>'}}
+    html+='<div class="qty-input"><span>Кол-во:</span><input type="number" value="'+(w.qty||1)+'" min="1" step="1" onchange="updateQty('+i+',this.value)"><span>шт</span></div>';
+    
+    // ИНДИВИДУАЛЬНЫЕ ПОЛЯ ДАТЫ И АДРЕСА ДЛЯ КАЖДОЙ РАБОТЫ
+    html+='<div class="edit-work-fields">';
+    html+='<div class="field-group"><div class="field-label"> Дата</div><input type="date" value="'+(w.workDate||'')+'" onchange="updateWorkField('+i+',\'workDate\',this.value)"></div>';
+    html+='<div class="field-group"><div class="field-label"> Адрес</div><input type="text" value="'+(w.workAddress||'')+'" placeholder="Адрес" onchange="updateWorkField('+i+',\'workAddress\',this.value)"></div>';
+    html+='</div>';
+    
+    html+='</div><button class="mini-btn" onclick="removeWork('+i+')">✕</button></div>'
+  });
+  list.innerHTML=html
+}
+
+// Обновление индивидуального поля работы
+function updateWorkField(idx, field, value){
+  if(selectedWorks[currentCategory] && selectedWorks[currentCategory][idx]){
+    selectedWorks[currentCategory][idx][field] = value;
+  }
+}
+
+function updateMeters(idx,val){const m=parseFloat(val)||0;selectedWorks[currentCategory][idx].meters=m;updateTotal();renderSelectedWorks()}
+function updateArea(idx,val){const a=parseFloat(val)||0;selectedWorks[currentCategory][idx].area=a;updateTotal();renderSelectedWorks()}
+function updateQty(idx,val){const q=parseInt(val)||1;selectedWorks[currentCategory][idx].qty=q;updateTotal();renderSelectedWorks()}
+function removeWork(idx){selectedWorks[currentCategory].splice(idx,1);renderWork()}
+
+function renderExtraWorks(){const list=document.getElementById('extraWorksList');if(!list)return;if(!extraWorks.length){list.innerHTML='<div class="empty-state">Нет доп. работ</div>';return}
+let html='';extraWorks.forEach((w,i)=>{
+  html+='<div class="extra-row"><input class="extra-input" value="'+w.n+'" onchange="updateExtra('+i+',\'n\',this.value)" style="margin:0"><input class="extra-input" type="number" value="'+w.p+'" onchange="updateExtra('+i+',\'p\',this.value)" style="margin:0"><button class="mini-btn" onclick="removeExtra('+i+')">✕</button></div>';
+  // Индивидуальные поля для доп. работ
+  html+='<div class="edit-work-fields">';
+  html+='<div class="field-group"><div class="field-label">📅 Дата</div><input type="date" value="'+(w.workDate||'')+'" onchange="updateExtraField('+i+',\'workDate\',this.value)"></div>';
+  html+='<div class="field-group"><div class="field-label">📍 Адрес</div><input type="text" value="'+(w.workAddress||'')+'" placeholder="Адрес" onchange="updateExtraField('+i+',\'workAddress\',this.value)"></div>';
+  html+='</div>';
+});list.innerHTML=html}
+
+function updateExtraField(i, field, value){
+  if(extraWorks[i]){
+    extraWorks[i][field] = value;
+  }
+}
+
+function addExtraWork(){
+  const n=document.getElementById('extraName').value.trim(),p=parseInt(document.getElementById('extraPrice').value)||0;
+  if(!n||!p){showToast('Укажи название и цену','reject');return}
+  const dateInput=document.getElementById('workDate');
+  const addressInput=document.getElementById('workAddress');
+  extraWorks.push({
+    n,p,
+    workDate:dateInput?dateInput.value:new Date().toISOString().split('T')[0],
+    workAddress:addressInput?addressInput.value.trim():''
+  });
+  document.getElementById('extraName').value='';document.getElementById('extraPrice').value='';renderWork()
+}
+function updateExtra(i,field,val){extraWorks[i][field]=field==='p'?parseInt(val)||0:val;updateTotal()}
+function removeExtra(i){extraWorks.splice(i,1);renderWork()}
+
+function updateTotal(){let total=0,count=0;Object.values(selectedWorks).forEach(arr=>{arr.forEach(w=>{count+=(w.qty||1);total+=calculateItemPrice(w)*(w.qty||1)})});extraWorks.forEach(w=>{count++;total+=w.p});document.getElementById('totalCount').textContent=count+' '+pluralWork(count);document.getElementById('totalSum').textContent=total.toLocaleString('ru-RU')+' ₽'}
+
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ - каждая работа имеет свою дату и адрес
+function addToReport(){
+  const newItems=[];
+  let newTotal=0;
+  
+  // Собираем работы из всех категорий с их ИНДИВИДУАЛЬНЫМИ датами и адресами
+  Object.values(selectedWorks).forEach(works=>{
+    works.forEach(w=>{
+      const item={cat:w.cat||currentCategory,...w};
+      item.totalPrice=calculateItemPrice(w)*(w.qty||1);
+      // Используем индивидуальную дату/адрес работы, если есть, иначе из формы
+      item.workDate=w.workDate||document.getElementById('workDate')?.value||new Date().toISOString().split('T')[0];
+      item.workAddress=w.workAddress||document.getElementById('workAddress')?.value.trim()||'';
+      newItems.push(item);
+      newTotal+=item.totalPrice;
+    });
+  });
+  extraWorks.forEach(w=>{
+    const item={cat:'Допы',...w,isExtra:true,totalPrice:w.p};
+    item.workDate=w.workDate||document.getElementById('workDate')?.value||new Date().toISOString().split('T')[0];
+    item.workAddress=w.workAddress||document.getElementById('workAddress')?.value.trim()||'';
+    newItems.push(item);
+    newTotal+=w.p;
+  });
+  
+  if(!newItems.length){showToast('Выбери хотя бы одну работу','reject');return}
+  
+  const reportWorkerName = workerName || currentUser.email.split('@')[0];
+  
+  // РЕДАКТИРОВАНИЕ - ПОЛНОСТЬЮ ЗАМЕНЯЕМ работы
+  if(editingReportId){
+    db.collection('reports').doc(editingReportId).update({
+      items:newItems,
+      total:newTotal,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    }).then(()=>{
+      showToast('Отчёт обновлён ('+newItems.length+' работ)','ok');
+      editingReportId=null;
+      selectedWorks={};extraWorks=[];currentCategory=null;
+      switchTab('reports');
+    }).catch(e=>showToast('Ошибка: '+e.message,'reject'));
+    return;
+  }
+  
+  // ДОБАВЛЕНИЕ В СУЩЕСТВУЮЩИЙ ЧЕРНОВИК
+  if(activeDraftId){
+    const draft=allReports.find(r=>r.id===activeDraftId);
+    if(!draft){showToast('Черновик не найден','reject');return}
+    const updateData={
+      items:[...draft.items,...newItems],
+      total:draft.total+newTotal,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    db.collection('reports').doc(activeDraftId).update(updateData).then(()=>{
+      showToast('Работы добавлены в отчёт (всего: '+(draft.items.length+newItems.length)+' работ)','ok');
+      selectedWorks={};extraWorks=[];currentCategory=null;
+      switchTab('reports');
+    }).catch(e=>showToast('Ошибка: '+e.message,'reject'));
+  }else{
+    // СОЗДАНИЕ НОВОГО ОТЧЁТА
+    const reportData={
+      workerEmail:currentUser.email,
+      workerName: reportWorkerName,
+      items:newItems,
+      total:newTotal,
+      workDate:newItems[0]?.workDate||new Date().toISOString().split('T')[0],
+      workAddress:newItems[0]?.workAddress||'',
+      status:'draft',
+      bossComment:'',
+      expenseComment:'',
+      expenseAmount:0,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    db.collection('reports').add(reportData).then(()=>{
+      showToast('Новый отчёт создан','ok');
+      selectedWorks={};extraWorks=[];currentCategory=null;
+      switchTab('reports');
+    }).catch(e=>showToast('Ошибка: '+e.message,'reject'));
+  }
+}
+
+function renderReports(){
+  const content=document.getElementById('reportsContent');
+  let reports=allReports;
+  if(currentRole==='worker')reports=reports.filter(r=>r.workerEmail===currentUser.email);
+  let toolbarHtml='';
+  if(currentRole==='boss'){
+    const uniqueWorkers=[...new Set(allReports.map(r=>r.workerEmail))];
+    toolbarHtml='<select class="filter-select" onchange="filterByWorker(this.value)"><option value="all">Все работники</option>';
+    uniqueWorkers.forEach(w=>{const worker=allReports.find(r=>r.workerEmail===w);const displayName=worker?worker.workerName:w;toolbarHtml+='<option value="'+w+'" '+(filterWorker===w?'selected':'')+'>'+displayName+' ('+w+')</option>'});
+    toolbarHtml+='</select>';
+    reports=reports.filter(r=>filterWorker==='all'||r.workerEmail===filterWorker)
+  }
+  if(currentRole==='worker'){
+    toolbarHtml='<div class="reports-toolbar"><button class="header-btn" onclick="toggleSelectionMode()" style="flex:1">'+(selectionMode?'✕ Отмена выбора':'🔗 Выбрать для объединения')+'</button></div>'
+  }
+  content.innerHTML=toolbarHtml+'<div id="reportsList"></div>';
+  const list=document.getElementById('reportsList');
+  if(!reports.length){list.innerHTML='<div class="empty-state" style="padding:30px">Нет отчётов</div>';return}
+  let html='';
+  reports.forEach(r=>{
+    const statusText={draft:'Черновик',pending:'На проверке',approved:'Одобрено',rejected:'Отклонено'}[r.status]||r.status;
+    const isSelected=selectedReportIds.includes(r.id);
+    html+='<div class="report-card'+(isSelected?' selected':'')+'" '+(selectionMode&&r.status==='draft'?'onclick="toggleReportSelection(\''+r.id+'\')"':'onclick="openReport(\''+r.id+'\')"')+'>';
+    if(selectionMode&&r.status==='draft'){html+='<div class="select-check">'+(isSelected?'✓':'')+'</div>'}
+    html+='<div class="report-head"><div style="flex:1">';
+    html+='<div class="report-date">📅 '+(r.workDate||'дата не указана')+'</div>';
+    if(r.workAddress){html+='<div class="report-address">📍 '+r.workAddress+'</div>'}
+    if(currentRole==='boss'){html+='<div class="report-worker-name">👤 '+(r.workerName||r.workerEmail)+'</div>'}
+    html+='</div><span class="status status-'+r.status+'">'+statusText+'</span></div>';
+    html+='<div style="font-size:12px;color:#6b7280">'+r.items.length+' работ</div>';
+    const totalWithExpenses = (r.total || 0) + (r.expenseAmount || 0);
+    html+='<div class="report-sum">'+totalWithExpenses.toLocaleString('ru-RU')+' ₽</div>';
+    html+='</div>'
+  });
+  list.innerHTML=html;
+  updateSelectionBar()
+}
+
+function renderStats(){
+  if(currentRole!=='worker')return;
+  const content=document.getElementById('statsContent');
+  const myReports=allReports.filter(r=>r.workerEmail===currentUser.email&&r.status==='approved');
+  
+  let html='<h2 style="margin-bottom:12px;font-size:18px;color:#1a1a1a">📊 Статистика заработка</h2>';
+  html+='<div class="period-selector">';
+  html+='<select class="filter-select" id="statsPeriod" onchange="updateStats()" style="margin:0;flex:1">';
+  html+='<option value="month">Этот месяц</option>';
+  html+='<option value="lastMonth">Прошлый месяц</option>';
+  html+='<option value="quarter">Квартал</option>';
+  html+='<option value="year">Год</option>';
+  html+='<option value="all">Все время</option>';
+  html+='</select>';
+  html+='</div>';
+  
+  const now=new Date();
+  const currentMonth=now.getMonth();
+  const currentYear=now.getFullYear();
+  
+  let filteredReports=myReports.filter(r=>{
+    if(!r.createdAt) return false;
+    const reportDate=r.createdAt.toDate();
+    const period=document.getElementById('statsPeriod')?.value||'month';
+    if(period==='month'){
+      return reportDate.getMonth()===currentMonth && reportDate.getFullYear()===currentYear;
+    }else if(period==='lastMonth'){
+      const lastMonth=new Date(currentYear,currentMonth-1,1);
+      return reportDate.getMonth()===lastMonth.getMonth() && reportDate.getFullYear()===lastMonth.getFullYear();
+    }else if(period==='quarter'){
+      const quarterStart=new Date(currentYear,Math.floor(currentMonth/3)*3,1);
+      return reportDate>=quarterStart;
+    }else if(period==='year'){
+      return reportDate.getFullYear()===currentYear;
+    }
+    return true;
+  });
+  
+  let totalEarnings=0;
+  filteredReports.forEach(r=>{
+    totalEarnings+=r.total||0;
+  });
+  
+  html+='<div class="stats-card">';
+  html+='<div class="stats-value">'+totalEarnings.toLocaleString('ru-RU')+' ₽</div>';
+  html+='<div class="stats-label">Заработано за период (только работы)</div>';
+  html+='</div>';
+  
+  html+='<div class="stats-card">';
+  html+='<div class="stats-value">'+filteredReports.length+'</div>';
+  html+='<div class="stats-label">Выполнено отчётов</div>';
+  html+='</div>';
+  
+  content.innerHTML=html;
+}
+
+function updateStats(){renderStats()}
+
+function filterByWorker(email){filterWorker=email;renderReports()}
+
+function toggleSelectionMode(){selectionMode=!selectionMode;selectedReportIds=[];renderReports()}
+function cancelSelection(){selectionMode=false;selectedReportIds=[];document.getElementById('selectionBar').style.display='none'}
+function toggleReportSelection(id){if(selectedReportIds.includes(id)){selectedReportIds=selectedReportIds.filter(x=>x!==id)}else{selectedReportIds.push(id)}renderReports()}
+
+function updateSelectionBar(){const bar=document.getElementById('selectionBar');if(selectionMode&&selectedReportIds.length>0){bar.style.display='flex';document.getElementById('selectionInfo').textContent='Выбрано черновиков: '+selectedReportIds.length}else{bar.style.display='none'}}
+
+function mergeSelectedReports(){
+  if(selectedReportIds.length<2){showToast('Выбери минимум 2 черновика','reject');return}
+  if(!confirm('Объединить '+selectedReportIds.length+' черновиков в один отчёт? Исходные черновики будут удалены.'))return;
+  const reportsToMerge=allReports.filter(r=>selectedReportIds.includes(r.id));
+  let mergedItems=[], mergedTotal=0, allAddresses=[], earliestDate=null;
+  reportsToMerge.forEach(r=>{
+    mergedItems=mergedItems.concat(r.items||[]);
+    mergedTotal+=r.total||0;
+    if(r.workAddress&&!allAddresses.includes(r.workAddress))allAddresses.push(r.workAddress);
+    if(r.workDate){if(!earliestDate||r.workDate<earliestDate)earliestDate=r.workDate;}
+  });
+  const mergedReport={
+    workerEmail:currentUser.email,
+    workerName:workerName,
+    items:mergedItems,
+    total:mergedTotal,
+    workDate:earliestDate||new Date().toISOString().split('T')[0],
+    workAddress:allAddresses.join('; '),
+    status:'draft',
+    bossComment:'',
+    expenseComment:'',
+    expenseAmount:0,
+    mergedFrom:reportsToMerge.map(r=>r.id),
+    createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  const deletePromises=reportsToMerge.map(r=>db.collection('reports').doc(r.id).delete());
+  Promise.all(deletePromises).then(()=>{
+    return db.collection('reports').add(mergedReport);
+  }).then(()=>{
+    showToast('Черновики объединены ('+reportsToMerge.length+' → 1)','ok');
+    cancelSelection();
+  }).catch(e=>showToast('Ошибка объединения: '+e.message,'reject'));
+}
+
+function openReport(id){
+  const report=allReports.find(r=>r.id===id);
+  if(!report)return;
+  document.getElementById('screenWork').classList.remove('active');
+  document.getElementById('screenReports').classList.remove('active');
+  document.getElementById('screenStats').classList.remove('active');
+  document.getElementById('screenDetail').classList.add('active');
+  document.getElementById('navWork').classList.remove('on');
+  document.getElementById('navReports').classList.remove('on');
+  document.getElementById('navStats').classList.remove('on');
+  document.getElementById('headerTitle').textContent = 'Мастер Ворот';
+  const content=document.getElementById('detailContent');
+  const date=report.createdAt?new Date(report.createdAt.seconds*1000).toLocaleString('ru-RU'):'—';
+  const statusText={draft:'Черновик',pending:'На проверке',approved:'Одобрено',rejected:'Отклонено'}[report.status]||report.status;
+  
+  const reportTitle = 'Отчет от '+(report.workerName||report.workerEmail);
+  let periodText='';
+  if(report.items && report.items.length>0){
+    const dates=report.items.map(i=>i.workDate).filter(d=>d);
+    if(dates.length>0){
+      const uniqueDates=[...new Set(dates)].sort();
+      if(uniqueDates.length===1){
+        periodText=' за '+uniqueDates[0];
+      }else{
+        periodText=' с '+uniqueDates[0]+' по '+uniqueDates[uniqueDates.length-1];
+      }
+    }
+  }
+  
+  let html='<button class="header-btn" onclick="backToReports()" style="margin-bottom:10px">← Назад</button>';
+  html+='<h2 style="font-size:16px;color:#1a1a1a;margin-bottom:10px">'+reportTitle+periodText+'</h2>';
+  html+='<div style="font-size:12px;color:#6b7280;margin-bottom:10px">Создан: '+date+' · <span class="status status-'+report.status+'" style="padding:2px 8px">'+statusText+'</span></div>';
+  
+  html+='<div style="margin-top:12px">';
+  report.items.forEach((item,idx)=>{
+    let priceText=item.totalPrice?item.totalPrice.toLocaleString('ru-RU')+' ₽':item.p.toLocaleString('ru-RU')+' ₽';
+    if(item.perMeter)priceText+=' ('+item.meters+' м)';
+    if(item.hasArea)priceText+=' ('+item.area+' м²'+(item.mountType==='high'?', высокий монтаж':'')+')';
+    if(item.qty&&item.qty>1)priceText+=' × '+item.qty+' шт';
+    
+    html+='<div class="work-item">';
+    if(item.cat && item.cat !== 'Допы'){
+      html+='<div class="work-item-category">'+item.cat+'</div>';
+    }
+    html+='<div class="work-item-header">';
+    html+='<div class="work-item-date"> '+(item.workDate||'дата не указана')+'</div>';
+    html+='<div class="work-item-address">📍 '+(item.workAddress||'адрес не указан')+'</div>';
+    html+='</div>';
+    html+='<div class="detail-info" style="flex:1">';
+    html+='<div class="detail-name" style="font-size:13px">'+item.n+(item.isExtra?' <span style="color:#6b7280;font-size:10px">(доп.)</span>':'')+'</div>';
+    html+='<div class="detail-price" style="margin-top:4px">'+priceText+'</div>';
+    html+='</div>';
+    if(currentRole==='worker'&&report.status==='draft'){
+      html+='<button class="mini-btn" onclick="deleteItemFromReport(\''+id+'\','+idx+')">✕</button>';
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+  
+  if(currentRole==='worker'){
+    html+='<div class="expense-section">';
+    html+='<div class="expense-label">💰 Расходы/возмещение (чеки, расходники)</div>';
+    html+='<textarea id="expenseComment" class="extra-input" placeholder="Описание расходов (чек за краску, расходники и т.д.)" style="margin-bottom:8px">'+(report.expenseComment||'')+'</textarea>';
+    html+='<input type="number" id="expenseAmount" class="extra-input" placeholder="Сумма расходов (₽)" value="'+(report.expenseAmount||'')+'" style="margin-bottom:8px">';
+    html+='<button class="header-btn" onclick="saveExpenses(\''+id+'\')" style="width:100%"> Сохранить расходы</button>';
+    html+='</div>';
+  }
+  
+  const workTotal=report.total||0;
+  const expenseAmount=report.expenseAmount||0;
+  const grandTotal=workTotal+expenseAmount;
+  
+  html+='<div style="margin-top:12px;padding:10px;background:#fff;border-radius:10px;border:1px solid #e5e7eb">';
+  html+='<div style="font-size:12px;color:#6b7280">Итого за работы: <span style="font-size:16px;font-weight:bold;color:#6366f1">'+workTotal.toLocaleString('ru-RU')+' ₽</span></div>';
+  if(expenseAmount>0){
+    html+='<div style="font-size:12px;color:#9a3412;margin-top:4px">Расходы: <span style="font-size:16px;font-weight:bold;color:#ea580c">'+expenseAmount.toLocaleString('ru-RU')+' ₽</span></div>';
+  }
+  html+='<div style="font-size:14px;color:#1a1a1a;margin-top:6px;padding-top:6px;border-top:1px solid #e5e7eb">Общая сумма: <span style="font-size:20px;font-weight:bold;color:#6366f1">'+grandTotal.toLocaleString('ru-RU')+' ₽</span></div>';
+  html+='</div>';
+  
+  if(report.bossComment){html+='<div style="margin-top:10px;padding:10px;background:#fff;border-radius:10px;border-left:3px solid '+(report.status==='approved'?'#10b981':'#ef4444')+'"><div style="font-size:11px;color:#6b7280;margin-bottom:3px">Комментарий руководителя</div><div style="font-size:13px;color:#1a1a1a">'+report.bossComment+'</div></div>'}
+  if(currentRole==='worker'&&report.status==='draft'){
+    html+='<button class="btn-edit" onclick="editReport(\''+report.id+'\')">✏️ Редактировать отчёт</button>';
+    html+='<button class="btn-send" onclick="sendReport(\''+report.id+'\')">📤 Отправить на проверку</button>';
+    html+='<button class="btn-new" onclick="createNewDraft()">➕ Создать новый отчёт</button>';
+    html+='<button class="btn-delete" onclick="deleteReport(\''+report.id+'\')">🗑️ Удалить отчёт</button>';
+  }
+  if(currentRole==='boss'&&report.status==='pending'){
+    html+='<div class="action-btns"><button class="btn-approve" onclick="approveReport(\''+report.id+'\')">✓ Одобрить</button><button class="btn-reject" onclick="rejectReport(\''+report.id+'\')">✕ Отказать</button></div>';
+  }
+  html+='<button class="btn-pdf" onclick="exportPDF(\''+report.id+'\')"> Экспорт в PDF</button>';
+  content.innerHTML=html
+}
+
+function saveExpenses(reportId){
+  const comment=document.getElementById('expenseComment').value.trim();
+  const amount=parseFloat(document.getElementById('expenseAmount').value)||0;
+  db.collection('reports').doc(reportId).update({
+    expenseComment:comment,
+    expenseAmount:amount,
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{
+    showToast('Расходы сохранены','ok');
+    openReport(reportId);
+  }).catch(e=>showToast('Ошибка: '+e.message,'reject'))
+}
+
+function createNewDraft(){
+  if(!confirm('Создать новый отчёт?'))return;
+  activeDraftId=null;
+  showToast('Теперь работы будут добавляться в новый отчёт','ok');
+  backToReports();
+}
+
+function deleteItemFromReport(reportId,itemIdx){
+  if(!confirm('Удалить эту работу из отчёта?'))return;
+  const report=allReports.find(r=>r.id===reportId);
+  if(!report)return;
+  report.items.splice(itemIdx,1);
+  let total=0;
+  report.items.forEach(item=>{total+=item.totalPrice||item.p});
+  db.collection('reports').doc(reportId).update({items:report.items,total:total,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{showToast('Работа удалена','ok');openReport(reportId)}).catch(e=>showToast('Ошибка: '+e.message,'reject'))
+}
+
+function sendReport(id){
+  if(!confirm('Отправить отчёт на проверку? После отправки редактирование будет недоступно.'))return;
+  db.collection('reports').doc(id).update({status:'pending',updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{
+    showToast('Отчёт отправлен на проверку','ok');
+    activeDraftId=null;
+    openReport(id)
+  }).catch(e=>showToast('Ошибка: '+e.message,'reject'))
+}
+
+function deleteReport(id){
+  if(!confirm('Удалить отчёт? Это действие нельзя отменить.'))return;
+  db.collection('reports').doc(id).delete().then(()=>{
+    showToast('Отчёт удалён','ok');
+    if(activeDraftId===id)activeDraftId=null;
+    backToReports()
+  }).catch(e=>showToast('Ошибка: '+e.message,'reject'))
+}
+
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ - сохраняет индивидуальные даты и адреса для каждой работы
+function editReport(id){
+  const report=allReports.find(r=>r.id===id);
+  if(!report)return;
+  editingReportId=id;
+  selectedWorks={};extraWorks=[];
+  
+  // Загружаем каждую работу с её ИНДИВИДУАЛЬНОЙ датой и адресом
+  report.items.forEach(item=>{
+    if(item.isExtra){
+      extraWorks.push({
+        n:item.n,p:item.p,
+        workDate:item.workDate||'',
+        workAddress:item.workAddress||''
+      });
+    }else{
+      if(!selectedWorks[item.cat])selectedWorks[item.cat]=[];
+      const sel={
+        n:item.n,p:item.p,
+        workDate:item.workDate||'',
+        workAddress:item.workAddress||''
+      };
+      if(item.perMeter){sel.perMeter=true;sel.meterName=item.meterName;sel.meters=item.meters||1}
+      if(item.hasArea){sel.hasArea=true;sel.area=item.area||0;sel.mountType=item.mountType||'standard'}
+      if(item.drive)sel.drive=item.drive;
+      sel.qty=item.qty||1;
+      selectedWorks[item.cat].push(sel)
+    }
+  });
+  
+  currentCategory=null;
+  switchTab('work');
+  
+  // Устанавливаем дату и адрес последней работы в общие поля (как подсказка)
+  setTimeout(()=>{
+    const dateInput=document.getElementById('workDate');
+    const addressInput=document.getElementById('workAddress');
+    const lastItem=report.items[report.items.length-1];
+    if(dateInput) dateInput.value=lastItem?.workDate||new Date().toISOString().split('T')[0];
+    if(addressInput) addressInput.value=lastItem?.workAddress||'';
+  },100);
+}
+
+function backToReports(){
+  editingReportId=null;
+  document.getElementById('screenDetail').classList.remove('active');
+  document.getElementById('screenReports').classList.add('active');
+  document.getElementById('navWork').classList.toggle('on',currentTab==='work');
+  document.getElementById('navReports').classList.toggle('on',currentTab==='reports');
+  document.getElementById('navStats').classList.toggle('on',currentTab==='stats');
+  document.getElementById('headerTitle').textContent = 'Мастер Ворот';
+}
+
+function approveReport(id){commentAction='approve';commentReportId=id;document.getElementById('commentTitle').textContent='Комментарий (необязательно)';document.getElementById('commentText').value='';document.getElementById('commentModal').classList.add('show')}
+function rejectReport(id){commentAction='reject';commentReportId=id;document.getElementById('commentTitle').textContent='Причина отказа';document.getElementById('commentText').value='';document.getElementById('commentModal').classList.add('show')}
+function closeComment(){document.getElementById('commentModal').classList.remove('show');commentAction=null;commentReportId=null}
+function confirmComment(){const comment=document.getElementById('commentText').value.trim();if(commentAction==='reject'&&!comment){showToast('Укажи причину отказа','reject');return}const newStatus=commentAction==='approve'?'approved':'rejected';db.collection('reports').doc(commentReportId).update({status:newStatus,bossComment:comment,bossEmail:currentUser.email,bossName:workerName,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>{closeComment();showToast(newStatus==='approved'?'Отчёт одобрен':'Отчёт отклонён',newStatus==='approved'?'ok':'reject')}).catch(e=>showToast('Ошибка: '+e.message,'reject'))}
+
+function exportPDF(id){
+  const report=allReports.find(r=>r.id===id);
+  if(!report)return;
+  showToast('Генерирую PDF...','ok');
+  const tempDiv=document.createElement('div');
+  tempDiv.style.cssText='position:fixed;left:-9999px;top:0;background:#fff;color:#000;padding:20px;width:600px;font-family:Arial';
+  const date=report.createdAt?new Date(report.createdAt.seconds*1000).toLocaleDateString('ru-RU'):'—';
+  const statusText={draft:'Черновик',pending:'На проверке',approved:'Одобрено',rejected:'Отклонено'}[report.status];
+  
+  let html='<h1 style="margin:0 0 8px;color:#6366f1">Отчёт: '+(report.workerName||report.workerEmail)+'</h1>';
+  html+='<div style="color:#666;margin-bottom:20px"> Период: '+(report.workDate||'Не указана')+(report.workAddress?'<br> Адрес: '+report.workAddress:'')+'<br>Создан: '+date+' · '+statusText+'</div>';
+  html+='<table style="width:100%;border-collapse:collapse;margin-bottom:20px">';
+  html+='<thead><tr style="background:#f0f0f0"><th style="padding:8px;border:1px solid #ddd;text-align:left;font-size:12px">Дата</th><th style="padding:8px;border:1px solid #ddd;text-align:left;font-size:12px">Адрес</th><th style="padding:8px;border:1px solid #ddd;text-align:left;font-size:12px">Работа</th><th style="padding:8px;border:1px solid #ddd;text-align:right;font-size:12px">Сумма</th></tr></thead>';
+  html+='<tbody>';
+  report.items.forEach(item=>{
+    let priceText=item.totalPrice?item.totalPrice.toLocaleString('ru-RU')+' ₽':item.p.toLocaleString('ru-RU')+' ₽';
+    if(item.perMeter)priceText+=' ('+item.meters+' м)';
+    if(item.hasArea)priceText+=' ('+item.area+' м²'+(item.mountType==='high'?', высокий монтаж':'')+')';
+    if(item.qty&&item.qty>1)priceText+=' × '+item.qty+' шт';
+    html+='<tr>';
+    html+='<td style="padding:8px;border:1px solid #ddd;font-size:12px">'+(item.workDate||'—')+'</td>';
+    html+='<td style="padding:8px;border:1px solid #ddd;font-size:12px">'+(item.workAddress||'—')+'</td>';
+    html+='<td style="padding:8px;border:1px solid #ddd;font-size:12px">'+(item.cat?item.cat+': ':'')+item.n+(item.isExtra?' (доп.)':'')+'</td>';
+    html+='<td style="padding:8px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:bold">'+priceText+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  const workTotal=report.total||0;
+  const expenseAmount=report.expenseAmount||0;
+  const grandTotal=workTotal+expenseAmount;
+  html+='<div style="margin-top:20px;padding:12px;background:#f0f0f0;border-radius:8px;text-align:right"><div style="font-size:14px;color:#666">Итого за работы: '+workTotal.toLocaleString('ru-RU')+' ₽</div>';
+  if(expenseAmount>0)html+='<div style="font-size:12px;color:#9a3412">Расходы: '+expenseAmount.toLocaleString('ru-RU')+' ₽</div>';
+  html+='<div style="font-size:24px;font-weight:bold;color:#6366f1;margin-top:6px">Общая сумма: '+grandTotal.toLocaleString('ru-RU')+' ₽</div></div>';
+  if(report.bossComment)html+='<div style="margin-top:12px;padding:10px;background:#fff3cd;border-radius:8px;border-left:3px solid #f59e0b"><b>Комментарий руководителя:</b> '+report.bossComment+'</div>';
+  tempDiv.innerHTML=html;
+  document.body.appendChild(tempDiv);
+  html2canvas(tempDiv,{scale:2,backgroundColor:'#ffffff'}).then(canvas=>{
+    const imgData=canvas.toDataURL('image/png');
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF('p','mm','a4');
+    const imgWidth=210;
+    const imgHeight=canvas.height*imgWidth/canvas.width;
+    pdf.addImage(imgData,'PNG',0,0,imgWidth,imgHeight);
+    pdf.save('Отчет_'+(report.workerName||report.workerEmail)+'_'+(report.workDate||date)+'.pdf');
+    showToast('PDF сохранён','ok');
+    document.body.removeChild(tempDiv);
+  }).catch(e=>{showToast('Ошибка PDF: '+e.message,'reject');document.body.removeChild(tempDiv)})
+}
+
+function showMenu(){document.getElementById('menuModal').classList.add('show')}
+function closeMenu(){document.getElementById('menuModal').classList.remove('show')}
+document.querySelectorAll('.modal').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show')})});
+</script>
+</body>
+</html>
